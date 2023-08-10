@@ -6,253 +6,187 @@ from selenium.webdriver.support import expected_conditions as EC
 from selenium.webdriver.chrome.options import Options
 from seleniumwire import webdriver
 import time
-import asyncio
-import aiogram
 import random
-import requests
+import asyncio
+import multiprocessing
+from aiogram import Dispatcher, Bot, executor, types
+from aiogram.dispatcher import FSMContext
+from aiogram.dispatcher.filters.state import State, StatesGroup
+from aiogram.contrib.middlewares.logging import LoggingMiddleware
+from aiogram.dispatcher.middlewares import BaseMiddleware
+from aiogram.contrib.middlewares.logging import LoggingMiddleware
+from aiogram.dispatcher.middlewares import BaseMiddleware
+from aiogram.contrib.fsm_storage.memory import MemoryStorage
+from chromedriver.scraper_gumtree import Ad, cycle_one, print_ads, proxy_setup
 
 
-class Ad:
-    def __init__(self, element: WebElement):
-        self.element = element
-        self.seller_rating = None
-        self.item_name = None
-        self.price = None
-        self.publication_time = None
-        self.views = None
-        self.date_registered = None
-        self.ad_link = None
-        self.location = None
-        self.id = None
-
-    def get_info(self):
-        return {
-            "item_name": self.item_name,
-            "price": self.price,
-            "publication_time": self.publication_time,
-            "ad_link": self.ad_link,
-            "location": self.location,
-            "id": self.id,
-            "date_registered": self.date_registered
-        }
-
-    def extract_data_intital(self):  # extract data for first time ( without going into )
-        self.item_name = self.element.find_element(By.CLASS_NAME, "user-ad-row-new-design__title-span").text
-        try:
-            self.price = self.element.find_element(By.CLASS_NAME, "user-ad-price-new-design__price").text
-        except Exception:  # ???? ??? ???? ?? ????? ?????????
-            return 0
-        self.publication_time = self.element.find_element(By.CLASS_NAME, "user-ad-row-new-design__age").text
-        self.ad_link = self.element.get_attribute("href")
-        self.location = self.element.find_element(By.CLASS_NAME, "user-ad-row-new-design__location").text
-        url_parts = self.ad_link.split('/')
-        # Get the last part of the URL which contains the ID
-        id_part = url_parts[-1]
-        # Extract the ID from the part by removing any non-digit characters
-        self.id = ''.join(filter(str.isdigit, id_part))
-        return 1
-
-    def click_ad(self, driver):
-        current_window = driver.current_window_handle  # Get the current window handle
-        # Open the ad URL in a new tab or window
-        driver.execute_script("window.open(arguments[0]);", self.ad_link)
-        # Switch to the new tab or window
-        for window_handle in driver.window_handles:
-            if window_handle != current_window:
-                driver.switch_to.window(window_handle)
-                break
-        WebDriverWait(driver, timeout=10)
-        try:
-            try:
-                self.date_registered = driver.find_element(By.CLASS_NAME, "seller-profile__member-since").text
-            except NoSuchElementException:
-                self.date_registered = driver.find_element(By.CLASS_NAME, "user-rating__description").text
-                if self.date_registered == "Highly Rated":
-                    driver.close()
-                    driver.switch_to.window(current_window)
-                    return 0
-        except Exception as e:
-            print("e", self.ad_link)
-            driver.close()
-            driver.switch_to.window(current_window)
-            return 0
-
-        driver.close()
-        driver.switch_to.window(current_window)
-        return 1
-
-    def print_info(self):
-        print("Title:", self.item_name)
-        print("Price:", self.price)
-        print("Location:", self.location)
-        print("P_time:", self.publication_time)
-        print("Link:", self.ad_link)
-        print("Id:", self.id)
-        print("Registred_date", self.date_registered)
-        print("----------------------")
-
-    # questions about everything
-    def is_car_ad(self) -> bool:
-        car_brands = ["audi", "mg", "fuso", "bmw", "mercedes", "volkswagen", "ford", "chevrolet", "toyota", "honda",
-                      "nissan",
-                      "subaru", "hyundai", "kia", "mazda", "mitsubishi", "lexus", "jaguar", "land rover",
-                      "harley-davidson", "yamaha", "honda", "suzuki", "kawasaki", "ducati", "haval", "jeep",
-                      "holden", "trailer", "peugeot", "ram", "caravan", "alfa", "wagon", "mitsubisi", "hlv", "takeuchi",
-                      "skoda","wanted", "mustang"]
-
-        keywords = car_brands
-
-        for keyword in keywords:
-            if keyword in self.item_name.lower():
-                return True
-        return False
-
-    def is_house_rental_ad(self) -> bool:
-        rental_keywords = ["house", "apartment", "rent", "rental"]
-        for keyword in rental_keywords:
-            if keyword in self.item_name.lower():
-                return True
-            return False
-
-    def is_job_offer_ad(self) -> bool:
-        job_keywords = ["job", "work", "employment", "career"]
-        for keyword in job_keywords:
-            if keyword in self.item_name.lower():
-                return True
-        return False
-
-    def is_pet_ad(self) -> bool:
-        pet_keywords = ["pet", "dog", "cat", "puppy", "kitten", "bird", "parrot", "fish", "hamster", "rabbit",
-                        "guinea pig", "turtle", "snake", "lizard", "reptile", "horse", "pony", "goat", "sheep",
-                        "chicken", "rooster", "duck", "gecko", "ferret", "gerbil", "rat", "mouse"]
-        pet_breeds = ["labrador", "golden retriever", "bulldog", "poodle", "beagle", "german shepherd", "rottweiler",
-                      "siberian husky", "boxer", "maine coon", "persian", "siamese", "bengal", "ragdoll",
-                      "british shorthair",
-                      "abyssinian", "goldfish", "betta fish", "siamese fighting fish", "guinea pig", "dwarf rabbit",
-                      "netherland dwarf rabbit", "african grey parrot", "budgerigar", "cockatiel", "aqua", "horse",
-                      "pony", "domestic shorthair", "domestic longhair"]
-        keywords = pet_keywords + pet_breeds
-
-        for keyword in keywords:
-            if keyword in self.item_name.lower():
-                return True
-        return False
-
-    def is_ad_ok(self) -> bool:
-        if not (self.is_car_ad() or self.is_pet_ad() or self.is_job_offer_ad() or self.is_house_rental_ad()):
-            if self.price != "Free":
-                return True
-        else:
-            return False
 
 
-def print_ads(ad_elements):
-    for ad_element in ad_elements:
-        print(ad_element.get_attribute("outerHTML"))
-        print()
 
-
-def cycle_one(ads, driver, ad_elements):
-    for ad_element in ad_elements:
-        try:
-            ad_tmp = Ad(ad_element)
-            flag = ad_tmp.extract_data_intital()
-            if flag and ad_tmp.is_ad_ok():
-                ads.append(ad_tmp)
-        except Exception as e:
-            print(f"An error occurred while processing an ad: {str(e)}")
-
-    for ad in ads:
-        flag = ad.click_ad(driver)
-        ad.print_info()
-        if not flag:
-            ads.remove(ad)
-
-
-def proxy_setup(ans):
-    proxy_ip = ["45.138.156.83", "195.208.181.150"]
-    proxy_port = [63818, 63182]
-    proxy_username = "ibYmjwaQ"
-    proxy_password = "muQmJ4gV"
-    proxy_options1 = {
-        'proxy': {
-            'http': f'http://{proxy_username}:{proxy_password}@{proxy_ip[0]}:{proxy_port[0]}',
-            'https': f'https://{proxy_username}:{proxy_password}@{proxy_ip[0]}:{proxy_port[0]}'
-        },
-        'executable_manager': "/Users/nikmarf/pythonProject4/chromedriver/chromedriver",
-    }
-    proxy_options2 = {
-        'proxy': {
-            'http': f'http://{proxy_username}:{proxy_password}@{proxy_ip[1]}:{proxy_port[1]}',
-            'https': f'https://{proxy_username}:{proxy_password}@{proxy_ip[1]}:{proxy_port[1]}'
-        },
-        'executable_manager': "/Users/nikmarf/pythonProject4/chromedriver/chromedriver",
-    }
-    if ans == 1:
-        return proxy_options1
-    if ans == 2:
-        return proxy_options2
-chrome_options = Options()
-# chrome_options.add_argument("--headless")
-url = "https://www.gumtree.com.au/s-r500"
-driver = webdriver.Chrome(options=chrome_options, seleniumwire_options=proxy_setup(2))
-ads_finished = {}  # ??????? ? ??????? ?? ????? ( ????) ????? ????? ?????? ad, .get_info() ????? ?????????? ??????? ?? ????? ?????? ??????
-
-
-'''
- # used_ads - ????? ??? ????? ???????? id ????? ???????? ? ?? ?????????????. ???? ?????? ????? ???? ?????? ???????
- ?????? ? ??????. ?? ? ?? ????? ?????? ?? ????????? ? ???????? ? ??, ??? ??? ???? ??? ???????
-'''
 # telegram part
-bot = aiogram.Bot(token='6237128583:AAFtVuZobkQNwyHIRgzshAfoihpWRyJ-4VI')
-chat_id = [371348044,5613237024]
+
+
+storage = MemoryStorage()
+bot = Bot(token='6237128583:AAFtVuZobkQNwyHIRgzshAfoihpWRyJ-4VI')
+dp = Dispatcher(bot, storage=storage)
+vip = [371348044, 5613237024, 770310010]
+active_chat_ids = []
+chats_ids_dict = {key: 0 for key in vip}
+
+
+async def set_commands():
+    commands = [
+        types.BotCommand(command="/help", description="Все доступные команды"),
+        types.BotCommand(command="/start", description="Запускает бота"),
+        types.BotCommand(command="/start_time", description="Запускает бота на определенное время"),
+        types.BotCommand(command="/payment", description="Оплата и контакты"),
+        types.BotCommand(command="/exit", description="Выключить бота")
+    ]
+    await bot.set_my_commands(commands)
 
 
 async def send_telegram_message(chat_id, text):
     await bot.send_message(chat_id, text)
 
-async def main():
+
+HELP_COMMAND = """
+/help - список команд
+/start - запустить бота (автоматом стоит на час)
+/start_time - запустить бота на время
+/payment - оплатить подписку за бота 
+/exit - выключить бота 
+"""
+
+payment_reminder = "К сожалению вы не оплатили бота. Если вы хотите его оплатить, или уже оплатили но видите это сообщение напишите @sky7walker"
+
+
+class TimerSetupStates(StatesGroup):
+    WAITING_FOR_TIMER = State()
+
+@dp.message_handler(commands=['help'])
+async def help_command(message: types.Message):
+    await message.reply(text=HELP_COMMAND)
+    print("HELP")
+
+
+@dp.message_handler(commands=['payment'])
+async def payment_command(message: types.Message):
+    await message.reply(text="🤑 По вопросам оплаты пишите @sky7walker. 🤕 По проблемам с ботом пишите @grerik")
+
+
+@dp.message_handler(commands=['start'])
+async def start_command(message: types.Message):
+    chat_id = message.chat.id
+    if chat_id not in vip:
+        await message.reply(payment_reminder)
+    else:
+        chats_ids_dict[message.chat.id] = 1 * 60 * 60 + time.time()
+        print(chats_ids_dict[message.chat.id], message.chat.id)
+        await message.reply(text="Вы запустили бота на час. Удачной работы 😤")
+
+@dp.message_handler(commands=['start_time'])
+async def start_timer_command(message: types.Message, state: FSMContext):
+    # Set the state to WAITING_FOR_TIMER
+    await TimerSetupStates.WAITING_FOR_TIMER.set()
+    chat_id = message.chat.id
+    if chat_id not in vip:
+        await message.reply(payment_reminder)
+        await state.finish()
+    else:
+        await message.reply(text="Введите значение таймера (в часах):")
+
+@dp.message_handler(state=TimerSetupStates.WAITING_FOR_TIMER)
+async def process_timer_value(message: types.Message, state: FSMContext):
+    chat_id = message.chat.id
+    if chat_id not in vip:
+        await message.reply(payment_reminder)
+        await state.finish()
+    else:
+        try:
+            timer_value = int(message.text)
+            chats_ids_dict[message.chat.id] = timer_value * 60 * 60 + time.time()
+            await message.reply(text=f"Бот установлен на {timer_value} часов.Удачной работы")
+        except ValueError:
+            await message.reply(text="Некорректное значение таймера. Введите число (в часах).")
+
+        await state.finish()
+
+@dp.message_handler(lambda message: not message.is_command() and not message.text.isdigit())
+async def process_other_messages(message: types.Message):
+    # Handle other messages that are not commands and not a number (when the user is not setting up the timer)
+    await message.reply(text="Я не понимаю вас 😢.")
+
+
+async def check_for_new_users(chats_ids_dict):
+    for key, val in chats_ids_dict.items():
+        if val > time.time():
+            if key not in active_chat_ids:
+                active_chat_ids.append(key)
+        else:
+            if key in active_chat_ids:
+                active_chat_ids.pop(key)
+    if len(active_chat_ids) == 0:
+        return False
+    else:
+        return True
+
+async def start_bot():
+    await set_commands()
+    await dp.skip_updates()
+    await dp.start_polling()
+
+async def main_work(queue):
+    chrome_options = Options()
+    url = "https://www.gumtree.com.au/s-r500"
+    driver = webdriver.Chrome(options=chrome_options, seleniumwire_options=proxy_setup(1))
+    ads_finished = {}
+    print(10)
     used_ads = []
     while True:
-        driver.get(url)
-        ad_collection_section = driver.find_element(By.CLASS_NAME, "search-results-page__user-ad-collection")
-        ad_elements = ad_collection_section.find_elements(By.CLASS_NAME, "user-ad-row-new-design")
-        ads = []
-        cycle_one(ads, driver, ad_elements)
-        driver.refresh()
-        used_chats = chat_id[:]
-        for ad in ads:
-            if ad.id not in ads_finished.keys():
-                if ad.id not in used_ads:
-                    ads_finished[ad.id] = ad
-                    message = "Title: {}\nPrice: {}\nLocation: {}\nP_time: {}\nLink: {}\nId: {}\nRegistred_date: {}".format(
-                        ad.item_name, ad.price, ad.location, ad.publication_time, ad.ad_link, ad.id, ad.date_registered)
-                    if len(used_chats) > 0:
-                        random_index = random.randint(0, len(used_chats) - 1)
-                        selected_chat_id = used_chats.pop(random_index)
-                    else:
-                        used_chats = chat_id[:]
-                        random_index = random.randint(0, len(used_chats) - 1)
-                        selected_chat_id = used_chats.pop(random_index)
-                    await send_telegram_message(selected_chat_id, message)
-                    ads_finished[ad.id].print_info()
-                    used_ads.append(ad.id)
+        if await check_for_new_users(chats_ids_dict):
+            print("Passed")
+            driver.get(url)
+            ad_collection_section = driver.find_element(By.CLASS_NAME, "search-results-page__user-ad-collection")
+            ad_elements = ad_collection_section.find_elements(By.CLASS_NAME, "user-ad-row-new-design")
+            ads = []
+            cycle_one(ads, driver, ad_elements)
+            driver.refresh()
+            used_chats = active_chat_ids[:]
+            for ad in ads:
+                if ad.id not in ads_finished.keys():
+                    if ad.id not in used_ads:
+                        ads_finished[ad.id] = ad
+                        message = "Title: {}\nPrice: {}\nLocation: {}\nP_time: {}\nLink: {}\nId: {}\nRegistred_date: {}".format(
+                            ad.item_name, ad.price, ad.location, ad.publication_time, ad.ad_link, ad.id, ad.date_registered)
+                        if len(used_chats) > 0:
+                            random_index = random.randint(0, len(used_chats) - 1)
+                            selected_chat_id = used_chats.pop(random_index)
+                        else:
+                            used_chats = active_chat_ids[:]
+                            random_index = random.randint(0, len(used_chats) - 1)
+                            selected_chat_id = used_chats.pop(random_index)
+                        await send_telegram_message(selected_chat_id, message)
+                        ads_finished[ad.id].print_info()
+                        used_ads.append(ad.id)
 
 
 
+def start_bot_sync(queue):
+    asyncio.run(start_bot(queue))
 
-asyncio.run(main())
-# while True: #??????????? ????
-#     driver.get(url)
-#     ad_collection_section = driver.find_element(By.CLASS_NAME, "search-results-page__user-ad-collection")
-#     ad_elements = ad_collection_section.find_elements(By.CLASS_NAME, "user-ad-row-new-design")
-#     ads = []
-#     cycle_one(ads, driver)
-#     driver.refresh()
-#     for ad in ads:
-#         if ad.id not in ads_finished.keys():
-#             if ad.id not in used_ads:
-#                 ads_finished[ad.id] = ad
-#                 ads_finished[ad.id].print_info()
+def main_work_sync(queue):
+    asyncio.run(main_work(queue))
+
+if __name__ == '__main__':
+    queue = multiprocessing.Queue()
+
+    start_bot_process = multiprocessing.Process(target=start_bot_sync, args=(queue,))
+    main_work_process = multiprocessing.Process(target=main_work_sync, args=(queue,))
+
+    start_bot_process.start()
+    main_work_process.start()
+
+    start_bot_process.join()
+    main_work_process.join()
 
 
