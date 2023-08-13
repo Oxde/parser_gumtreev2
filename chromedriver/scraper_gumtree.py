@@ -91,7 +91,7 @@ class Ad:
                       "subaru", "hyundai", "kia", "mazda", "mitsubishi", "lexus", "jaguar", "land rover",
                       "harley-davidson", "yamaha", "honda", "suzuki", "kawasaki", "ducati", "haval", "jeep",
                       "holden", "trailer", "peugeot", "ram", "caravan", "alfa", "wagon", "mitsubisi", "hlv", "takeuchi",
-                      "skoda", "wanted", "mustang"]
+                      "skoda", "wanted", "mustang","porsche","renault","tesla","excavator"]
 
         keywords = car_brands
 
@@ -161,8 +161,8 @@ def cycle_one(ads, driver, ad_elements):
             ads.remove(ad)
 
 def proxy_setup(ans):
-    proxy_ip = ["185.110.130.145", "185.110.130.145"]
-    proxy_port = [62236, 62236]
+    proxy_ip = ["195.209.102.76", "195.209.102.76"]
+    proxy_port = [63950, 63950]
     proxy_username = "ibYmjwaQ"
     proxy_password = "muQmJ4gV"
     proxy_options1 = {
