@@ -68,6 +68,8 @@ async def start_command(message: types.Message):
         await message.reply(payment_reminder)
     else:
         ultimative_memory_tmp['chats_ids_dict'][str(chat_id)] = 1 * 60 * 60 + time.time()
+        if str(chat_id) not in ultimative_memory_tmp['active_chat_ids']:
+            ultimative_memory_tmp['active_chat_ids'].append(str(chat_id))
         print(ultimative_memory_tmp)
         await save_configuration('config.json', ultimative_memory_tmp)
         await message.reply(text="Вы запустили бота на час. Удачной работы 😤")
@@ -95,7 +97,7 @@ async def process_timer_value(message: types.Message, state: FSMContext):
         try:
             timer_value = int(message.text)
             ultimative_memory_tmp['chats_ids_dict'][str(chat_id)] = timer_value * 60 * 60 + time.time()
-            await save_configuration('config.json',ultimative_memory_tmp)
+            await save_configuration('config.json', ultimative_memory_tmp)
             await message.reply(text=f"Бот установлен на {timer_value} часов.Удачной работы")
         except ValueError:
             await message.reply(text="Некорректное значение таймера. Введите число (в часах).")
@@ -138,7 +140,6 @@ async def main_work():
     ads_finished = {}
     used_ads = []
     while True:
-        ultimative_memory_tmp = await load_configuration('config.json')
         if await check_users():
             print("Passed")
             driver.get(url)
@@ -147,6 +148,7 @@ async def main_work():
             ads = []
             cycle_one(ads, driver, ad_elements)
             driver.refresh()
+            ultimative_memory_tmp = await load_configuration('config.json')
             used_chats = ultimative_memory_tmp['active_chat_ids'][:]
             for ad in ads:
                 if ad.id not in ads_finished.keys():
@@ -184,4 +186,3 @@ if __name__ == '__main__':
     start_bot_process.join()
     main_work_process.join()
 
-    

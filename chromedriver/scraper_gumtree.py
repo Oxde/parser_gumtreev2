@@ -91,7 +91,7 @@ class Ad:
                       "subaru", "hyundai", "kia", "mazda", "mitsubishi", "lexus", "jaguar", "land rover",
                       "harley-davidson", "yamaha", "honda", "suzuki", "kawasaki", "ducati", "haval", "jeep",
                       "holden", "trailer", "peugeot", "ram", "caravan", "alfa", "wagon", "mitsubisi", "hlv", "takeuchi",
-                      "skoda", "wanted", "mustang","porsche","renault","tesla","excavator"]
+                      "skoda", "wanted", "mustang","porsche","renault","tesla","excavator","goldstar","isuzu"]
 
         keywords = car_brands
 
@@ -183,5 +183,3 @@ def proxy_setup(ans):
         return proxy_options1
     if ans == 2:
         return proxy_options2
-
-
