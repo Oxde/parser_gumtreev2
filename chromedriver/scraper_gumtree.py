@@ -33,7 +33,7 @@ class Ad:
         self.item_name = self.element.find_element(By.CLASS_NAME, "user-ad-row-new-design__title-span").text
         try:
             self.price = self.element.find_element(By.CLASS_NAME, "user-ad-price-new-design__price").text
-        except Exception:  # ???? ??? ???? ?? ????? ?????????
+        except Exception:
             return 0
         self.publication_time = self.element.find_element(By.CLASS_NAME, "user-ad-row-new-design__age").text
         self.ad_link = self.element.get_attribute("href")
@@ -47,31 +47,31 @@ class Ad:
 
     def click_ad(self, driver):
         current_window = driver.current_window_handle  # Get the current window handle
-        # Open the ad URL in a new tab or window
         driver.execute_script("window.open(arguments[0]);", self.ad_link)
-        # Switch to the new tab or window
         for window_handle in driver.window_handles:
             if window_handle != current_window:
                 driver.switch_to.window(window_handle)
                 break
-        WebDriverWait(driver, timeout=10)
         try:
-            try:
-                self.date_registered = driver.find_element(By.CLASS_NAME, "seller-profile__member-since").text
-            except NoSuchElementException:
-                self.date_registered = driver.find_element(By.CLASS_NAME, "user-rating__description").text
-                if self.date_registered == "Highly Rated":
-                    driver.close()
-                    driver.switch_to.window(current_window)
-                    return 0
+            # Use a customized condition to wait for the specific element you need
+            date_element = WebDriverWait(driver, timeout=1).until(
+                EC.presence_of_element_located((By.CLASS_NAME, "seller-profile__member-since"))
+                or EC.presence_of_element_located((By.CLASS_NAME, "user-rating__description"))
+            )
+
+            # Check which element was found and extract the information accordingly
+            if "seller-profile__member-since" in date_element.get_attribute("class"):
+                self.date_registered = date_element.text
+            else:
+                self.date_registered = "Highly Rated"
+
         except Exception as e:
             print("e", self.ad_link)
+            return 0
+        finally:
             driver.close()
             driver.switch_to.window(current_window)
-            return 0
 
-        driver.close()
-        driver.switch_to.window(current_window)
         return 1
 
     def print_info(self):

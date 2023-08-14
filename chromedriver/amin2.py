@@ -10,6 +10,8 @@ from aiogram.dispatcher.filters.state import State, StatesGroup
 from selenium.webdriver.chrome.options import Options
 from selenium.webdriver.common.by import By
 from seleniumwire import webdriver
+from selenium.webdriver.support.ui import WebDriverWait
+from selenium.webdriver.support import expected_conditions as EC
 
 from chromedriver.scraper_gumtree import cycle_one, proxy_setup
 
@@ -120,7 +122,7 @@ async def check_users():
                 ultimative_memory_tmp['active_chat_ids'].append(key)
         else:
             if key in ultimative_memory_tmp['active_chat_ids']:
-                ultimative_memory_tmp['active_chat_ids'].pop(key)
+                ultimative_memory_tmp['active_chat_ids'].remove((key))
 
     await save_configuration('config.json', ultimative_memory_tmp)
     if len(ultimative_memory_tmp['active_chat_ids']) == 0:
@@ -135,6 +137,8 @@ async def start_bot():
 
 async def main_work():
     chrome_options = Options()
+    chrome_options.add_argument("--blink-settings=imagesEnabled=false")
+
     url = "https://www.gumtree.com.au/s-r500"
     driver = webdriver.Chrome(options=chrome_options, seleniumwire_options=proxy_setup(1))
     ads_finished = {}
@@ -143,7 +147,9 @@ async def main_work():
         if await check_users():
             print("Passed")
             driver.get(url)
-            ad_collection_section = driver.find_element(By.CLASS_NAME, "search-results-page__user-ad-collection")
+            ad_collection_section = WebDriverWait(driver, timeout=1).until(
+                EC.presence_of_element_located((By.CLASS_NAME, "search-results-page__user-ad-collection"))
+            )
             ad_elements = ad_collection_section.find_elements(By.CLASS_NAME, "user-ad-row-new-design")
             ads = []
             cycle_one(ads, driver, ad_elements)
