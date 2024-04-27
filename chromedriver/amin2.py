@@ -17,7 +17,7 @@ from chromedriver.scraper_gumtree import cycle_one, proxy_setup
 
 # telegram part
 storage = MemoryStorage()
-bot = Bot(token='6237128583:AAFtVuZobkQNwyHIRgzshAfoihpWRyJ-4VI')
+bot = Bot(token='')
 dp = Dispatcher(bot, storage=storage)
 
 
