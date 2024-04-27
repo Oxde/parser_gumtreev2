@@ -17,8 +17,8 @@ async def save_configuration(file_path, config_dict):
 
 if __name__ == '__main__':
     ultimative_memory = {
-        'vip': [371348044, 5613237024, 770310010],
+        'vip': [], - chat_id to send ads
         'active_chat_ids': [],
-        'chats_ids_dict': {371348044: 0, 5613237024: 0, 770310010: 0}
+        'chats_ids_dict': {: 0,: 0,: 0} #should be number of chat before :
     }
     asyncio.run(save_configuration('config.json', ultimative_memory))
